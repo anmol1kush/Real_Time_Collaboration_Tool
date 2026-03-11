@@ -19,7 +19,7 @@ export default function LoginForm() {
     setError("");
     try {
       const res = await axios.post("/auth/login", { email, password });
-      login(res.data);
+      login(res.data.token, res.data.user);
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Invalid credentials");

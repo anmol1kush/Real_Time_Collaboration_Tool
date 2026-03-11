@@ -1,14 +1,14 @@
 import http from "http";
 import dotenv from "dotenv";
 import { Server } from "socket.io";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 import app from "./app.js";
 import { connectMongo } from "./utils/mongo.js";
 import { initRedis } from "./utils/redis.js";
 import { prisma } from "./utils/prisma.js";
-
-// import { socketAuthMiddleware } from "./sockets/socketAuth.js";
-// import { registerSocketHandlers } from "./sockets/socketHandlers.js";
+import { socketAuthMiddleware } from "./sockets/socketAuth.js";
+import { registerSocketHandlers } from "./sockets/socketHandler.js";
 
 dotenv.config();
 
@@ -18,36 +18,24 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-/* -------- Socket.IO -------- */
-import { createProxyMiddleware } from "http-proxy-middleware";
+/* -------- Socket.IO Auth + Handlers -------- */
+io.use(socketAuthMiddleware);
 
-// ...
-
-// io.use(socketAuthMiddleware);
-// io.on("connection", (socket) => {
-//   registerSocketHandlers(io, socket);
-// });
+io.on("connection", (socket) => {
+  registerSocketHandlers(io, socket);
+});
 
 /* -------- CODESPACE PROXY -------- */
 app.use(
   "/codespace/:projectId",
   createProxyMiddleware({
-    // Using a dynamic router to find the target dynamically based on projectId
     router: async function (req) {
       const { projectId } = req.params;
-
-      // Look up the port in the Memory map from docker service
       const port = await import("./services/docker.service.js").then(m => m.codespacePorts.get(projectId));
-
-      if (port) {
-        return `http://localhost:${port}`;
-      }
-
-      // Fallback
-      return "http://localhost:8080";
+      return port ? `http://localhost:${port}` : "http://localhost:8080";
     },
     changeOrigin: true,
-    ws: true, // Websockets needed for VS Code server
+    ws: true,
     pathRewrite: (path, req) => path.replace(`/codespace/${req.params.projectId}`, ""),
   })
 );
@@ -55,13 +43,32 @@ app.use(
 const PORT = process.env.PORT || 3000;
 
 async function start() {
-  await prisma.$connect();
-  // await connectMongo();
-  // await initRedis();
+  try {
+    // PostgreSQL via Prisma
+    await prisma.$connect();
+    console.log("✅ PostgreSQL connected");
 
-  server.listen(PORT, () => {
-    console.log(`🚀 Backend running at http://localhost:${PORT}`);
-  });
+    // MongoDB (optional — for chat persistence)
+    try {
+      await connectMongo();
+    } catch (mongoErr) {
+      console.warn("⚠️  MongoDB not available — chat history disabled. Check Atlas IP whitelist.");
+    }
+
+    // Redis (optional — for presence tracking)
+    try {
+      await initRedis();
+    } catch (redisErr) {
+      console.warn("⚠️  Redis not available — presence features disabled. Start Redis to enable.");
+    }
+
+    server.listen(PORT, () => {
+      console.log(`🚀 Backend running at http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ Startup error:", err.message || err);
+    process.exit(1);
+  }
 }
 
 start();

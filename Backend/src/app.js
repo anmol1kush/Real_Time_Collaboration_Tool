@@ -2,7 +2,11 @@ import express from "express";
 import cors from "cors";
 
 import authRoutes from "./routes/auth.routes.js";
-// import projectRoutes from "./routes/project.routes.js";
+import projectRoutes from "./routes/project.routes.js";
+import taskRoutes, { taskStandaloneRouter } from "./routes/task.routes.js";
+import inviteRoutes from "./routes/invite.routes.js";
+import codespaceRoutes from "./routes/codespace.routes.js";
+import feedbackRoutes from "./routes/feedback.routes.js";
 
 const app = express();
 
@@ -12,11 +16,12 @@ app.use(express.json({ limit: "5mb" }));
 
 /* -------- Routes -------- */
 app.use("/api/auth", authRoutes);
-import codespaceRoutes from "./routes/codespace.routes.js";
+app.use("/api/projects", projectRoutes);
+app.use("/api/projects/:projectId/tasks", taskRoutes);
+app.use("/api/tasks", taskStandaloneRouter);
+app.use("/api/invites", inviteRoutes);
 app.use("/api/codespace", codespaceRoutes);
-import feedbackRoutes from "./routes/feedback.routes.js";
 app.use("/api/feedback", feedbackRoutes);
-// app.use("/api/projects", projectRoutes);
 
 app.get("/", (_, res) => {
   res.send("RTCT API is running");

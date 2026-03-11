@@ -1,14 +1,13 @@
-import { MongoClient } from "mongodb";
-
-let db;
+import mongoose from "mongoose";
 
 export async function connectMongo() {
-  const client = new MongoClient(process.env.MONGO_URI);
-  await client.connect();
-  db = client.db();
-  console.log(" MongoDB connected");
+  const uri = process.env.MONGO_URI;
+  if (!uri) throw new Error("MONGO_URI is not set in .env");
+
+  await mongoose.connect(uri);
+  console.log("✅ MongoDB (Mongoose) connected");
 }
 
 export function getMongoDb() {
-  return db;
+  return mongoose.connection.db;
 }

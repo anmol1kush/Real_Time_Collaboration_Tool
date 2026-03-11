@@ -1,45 +1,44 @@
-import { useEffect, useState, useRef } from "react";
-import { Excalidraw, exportToCanvas } from "@excalidraw/excalidraw";
+import { useEffect, useRef } from "react";
+import { Excalidraw } from "@excalidraw/excalidraw";
 
 const Whiteboard = ({ socket, projectId }) => {
-    const [excalidrawAPI, setExcalidrawAPI] = useState(null);
-    const isUpdating = useRef(false);
+    const excalidrawAPI = useRef(null);
+    const isReceiving = useRef(false);
 
     useEffect(() => {
-        if (!socket || !excalidrawAPI) return;
+        if (!socket || !excalidrawAPI.current) return;
 
-        // Listen for incoming changes
+        // Receive whiteboard changes from other users
         socket.on("whiteboard:updated", (elements) => {
-            isUpdating.current = true;
-            excalidrawAPI.updateScene({
-                elements: elements,
-            });
-            // slight timeout to prevent onChange from firing and broadcasting back
-            setTimeout(() => {
-                isUpdating.current = false;
-            }, 500);
+            if (!excalidrawAPI.current) return;
+            isReceiving.current = true;
+            excalidrawAPI.current.updateScene({ elements });
+            setTimeout(() => { isReceiving.current = false; }, 100);
         });
 
         return () => {
             socket.off("whiteboard:updated");
         };
-    }, [socket, excalidrawAPI]);
+    }, [socket, excalidrawAPI.current]);
 
-    const handleChange = (elements, state) => {
-        if (isUpdating.current) return;
-
-        // Broadcast changes
-        if (socket) {
-            socket.emit("whiteboard:update", { projectId, elements });
-        }
+    const handleChange = (elements) => {
+        if (isReceiving.current || !socket) return;
+        socket.emit("whiteboard:update", { projectId, elements });
     };
 
     return (
-        <div style={{ height: "600px", width: "100%" }} className="rounded-lg overflow-hidden border border-gray-700">
+        <div className="rounded-lg overflow-hidden border border-zinc-800" style={{ height: "600px", width: "100%" }}>
             <Excalidraw
-                excalidrawAPI={(api) => setExcalidrawAPI(api)}
+                excalidrawAPI={(api) => { excalidrawAPI.current = api; }}
                 onChange={handleChange}
                 theme="dark"
+                UIOptions={{
+                    canvasActions: {
+                        saveToActiveFile: false,
+                        loadScene: false,
+                        export: false,
+                    }
+                }}
             />
         </div>
     );
