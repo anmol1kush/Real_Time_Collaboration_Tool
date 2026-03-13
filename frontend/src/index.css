@@ -1,1 +1,238 @@
 @import "tailwindcss";
+
+/* ──────────────────────────────────────
+   EditorJS Dark Mode Overrides
+────────────────────────────────────── */
+
+/* Toolbar */
+.ce-toolbar__actions {
+  background: transparent !important;
+}
+.ce-toolbar__plus,
+.ce-toolbar__settings-btn {
+  color: rgba(255,255,255,0.3) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease;
+}
+.ce-toolbar__plus:hover,
+.ce-toolbar__settings-btn:hover {
+  color: rgba(255,255,255,0.85) !important;
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* Block popover / toolbox */
+.ce-popover,
+.ce-popover__container {
+  background: #161b22 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6) !important;
+}
+.ce-popover-item {
+  color: rgba(255,255,255,0.75) !important;
+  border-radius: 8px !important;
+}
+.ce-popover-item:hover,
+.ce-popover-item--active {
+  background: rgba(255,255,255,0.06) !important;
+  color: white !important;
+}
+.ce-popover-item__icon {
+  background: rgba(255,255,255,0.06) !important;
+  border-radius: 6px !important;
+  color: rgba(255,255,255,0.6) !important;
+}
+.ce-popover__search input {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 8px !important;
+  color: white !important;
+}
+.ce-popover__search input::placeholder {
+  color: rgba(255,255,255,0.2) !important;
+}
+.ce-popover__nothing-found-message {
+  color: rgba(255,255,255,0.25) !important;
+}
+
+/* Inline toolbar */
+.ce-inline-toolbar {
+  background: #1e2433 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+}
+.ce-inline-toolbar__dropdown,
+.ce-inline-tool,
+.ce-inline-toolbar__toggler-and-btn {
+  color: rgba(255,255,255,0.6) !important;
+}
+.ce-inline-tool:hover,
+.ce-inline-tool--active {
+  background: rgba(255,255,255,0.08) !important;
+  color: white !important;
+  border-radius: 6px !important;
+}
+.ce-conversion-toolbar {
+  background: #1e2433 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 10px !important;
+}
+.ce-conversion-tool {
+  color: rgba(255,255,255,0.7) !important;
+}
+.ce-conversion-tool:hover {
+  background: rgba(255,255,255,0.06) !important;
+}
+
+/* Block content */
+.ce-block__content {
+  max-width: none !important;
+}
+.cdx-block {
+  color: rgba(255,255,255,0.85) !important;
+}
+.ce-paragraph[data-placeholder]:empty::before {
+  color: rgba(255,255,255,0.2) !important;
+}
+
+/* Headers */
+.ce-header {
+  color: white !important;
+  font-weight: 700 !important;
+}
+
+/* Quote block */
+.cdx-quote__text {
+  border-left: 4px solid #6366f1 !important;
+  color: rgba(255,255,255,0.7) !important;
+}
+.cdx-quote__caption {
+  color: rgba(255,255,255,0.35) !important;
+}
+
+/* Code block */
+.ce-code__textarea {
+  background: #0d1117 !important;
+  color: #7ee787 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 10px !important;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  padding: 16px !important;
+  min-height: 120px !important;
+}
+
+/* Checklist */
+.cdx-checklist__item-checkbox {
+  border: 2px solid rgba(255,255,255,0.2) !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+}
+.cdx-checklist__item--checked .cdx-checklist__item-checkbox {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+}
+.cdx-checklist__item-text {
+  color: rgba(255,255,255,0.8) !important;
+}
+.cdx-checklist__item--checked .cdx-checklist__item-text {
+  text-decoration: line-through !important;
+  color: rgba(255,255,255,0.35) !important;
+}
+
+/* List */
+.cdx-list__item {
+  color: rgba(255,255,255,0.8) !important;
+}
+
+/* Delimiter */
+.ce-delimiter::before {
+  color: rgba(255,255,255,0.15) !important;
+}
+
+/* Table */
+.tc-table {
+  border-color: rgba(255,255,255,0.08) !important;
+}
+.tc-cell {
+  border-color: rgba(255,255,255,0.08) !important;
+  color: rgba(255,255,255,0.8) !important;
+  background: transparent !important;
+}
+.tc-cell:focus {
+  background: rgba(255,255,255,0.02) !important;
+}
+.tc-row:first-child .tc-cell {
+  background: rgba(255,255,255,0.03) !important;
+  font-weight: 600 !important;
+}
+.tc-add-column, .tc-add-row {
+  color: rgba(255,255,255,0.3) !important;
+}
+.tc-add-column:hover, .tc-add-row:hover {
+  color: rgba(255,255,255,0.7) !important;
+  background: rgba(255,255,255,0.05) !important;
+}
+.tc-popover {
+  background: #161b22 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+}
+.tc-popover__item {
+  color: rgba(255,255,255,0.7) !important;
+}
+.tc-popover__item:hover {
+  background: rgba(255,255,255,0.06) !important;
+}
+
+/* Marker (highlight) */
+.cdx-marker {
+  background: rgba(254, 202, 2, 0.25) !important;
+  color: inherit !important;
+  border-radius: 2px !important;
+  padding: 0 2px !important;
+}
+
+/* Inline code */
+.inline-code {
+  background: rgba(110, 118, 129, 0.2) !important;
+  color: #f78166 !important;
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.875em !important;
+}
+
+/* Simple image */
+.cdx-simple-image__picture img {
+  border-radius: 10px !important;
+  max-width: 100% !important;
+}
+.cdx-simple-image__caption {
+  color: rgba(255,255,255,0.35) !important;
+}
+
+/* Custom thin scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.16);
+}
