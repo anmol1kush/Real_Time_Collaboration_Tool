@@ -30,26 +30,22 @@ io.on("connection", (socket) => {
   registerSocketHandlers(io, socket);
 });
 
-/* -------- Debug requests -------- */
-app.use((req, res, next) => {
-  console.log("REQUEST HIT:", req.method, req.url);
-  next();
-});
-
-/* -------- CODESPACE PROXY -------- */
+/* -------- CODESPACE PROXY (must be registered BEFORE other middleware) -------- */
 const codespaceProxy = createProxyMiddleware({
+  target: "http://127.0.0.1:8080",   // required by http-proxy-middleware v3 (router overrides this)
   changeOrigin: true,
-  ws: true,
+  ws: false,  // WebSocket upgrades handled manually below (using http-proxy directly)
   xfwd: true,
   secure: false,
-  logLevel: "debug",
+  logger: console,
 
   router: async (req) => {
+    // originalUrl always has the full path (Express 5 strips mount path from req.url)
     const url = req.originalUrl || req.url;
     const match = url.match(/^\/codespace\/([^/?]+)/);
     const projectId = match ? match[1] : null;
 
-    if (!projectId) return "http://localhost:8080";
+    if (!projectId) return "http://127.0.0.1:8080";
 
     let port = codespacePorts.get(projectId);
 
@@ -61,41 +57,105 @@ const codespaceProxy = createProxyMiddleware({
         codespacePorts.set(projectId, port);
       } catch (err) {
         console.error("Missing container for:", projectId);
-        return "http://localhost:8080";
+        return "http://127.0.0.1:8080";
       }
     }
 
-    return `http://localhost:${port}`;
+    console.log(`[codespace-proxy] routing ${projectId} → port ${port}`);
+    return `http://127.0.0.1:${port}`;
   },
 
   pathRewrite: (path, req) => {
-    const url = req.originalUrl || req.url || path;
-    const match = url.match(/^\/codespace\/([^/?]+)/);
-    const projectId = match ? match[1] : null;
+    // In Express 5 with app.use("/codespace", proxy), req.url is stripped of /codespace
+    // but req.originalUrl keeps the full path. Use originalUrl for prefix matching.
+    const fullUrl = req.originalUrl || path;
+    const match = fullUrl.match(/^\/codespace\/([^/?]+)(.*)/);
 
-    if (!projectId) return path;
+    if (!match) return path;
 
-    // Remove the exact projectId prefix from the request path so code-server sees it as /
-    let newPath = path;
-    const prefix1 = `/codespace/${projectId}`;
-    const prefix2 = `/${projectId}`;
-
-    if (newPath.startsWith(prefix1)) {
-      newPath = newPath.substring(prefix1.length);
-    } else if (newPath.startsWith(prefix2)) {
-      newPath = newPath.substring(prefix2.length);
-    }
-
+    // Everything after /codespace/{projectId} is the real path for code-server
+    let newPath = match[2] || "/";
     if (!newPath.startsWith("/")) {
       newPath = "/" + newPath;
     }
-    
+
+    console.log(`[codespace-proxy] pathRewrite: ${fullUrl} → ${newPath}`);
     return newPath;
   }
 });
 
-/* Attach proxy */
+/* Attach proxy BEFORE other middleware so /codespace/* requests are caught first */
 app.use("/codespace", codespaceProxy);
+
+/* -------- Diagnostic: test WebSocket connectivity to a codespace container -------- */
+app.get("/api/codespace/:projectId/ws-test", (req, res) => {
+  const { projectId } = req.params;
+  const port = codespacePorts.get(projectId);
+  if (!port) {
+    return res.status(404).json({ error: "No cached port for this project" });
+  }
+
+  // Try a raw HTTP upgrade request to code-server
+  const testReq = http.request({
+    hostname: "127.0.0.1",
+    port: port,
+    path: "/",
+    method: "GET",
+    headers: {
+      "Connection": "Upgrade",
+      "Upgrade": "websocket",
+      "Sec-WebSocket-Version": "13",
+      "Sec-WebSocket-Key": "dGVzdA==",  // base64("test")
+      "Host": `127.0.0.1:${port}`,
+    },
+  });
+
+  const timeout = setTimeout(() => {
+    testReq.destroy();
+    res.status(504).json({ error: "Timeout - no response from code-server" });
+  }, 5000);
+
+  testReq.on("upgrade", (proxyRes, proxySocket, proxyHead) => {
+    clearTimeout(timeout);
+    proxySocket.destroy();
+    res.json({
+      success: true,
+      message: "WebSocket upgrade succeeded!",
+      statusCode: 101,
+      headers: proxyRes.headers,
+      port: port,
+    });
+  });
+
+  testReq.on("response", (proxyRes) => {
+    clearTimeout(timeout);
+    let body = "";
+    proxyRes.on("data", (chunk) => body += chunk);
+    proxyRes.on("end", () => {
+      res.json({
+        success: false,
+        message: `Got HTTP ${proxyRes.statusCode} instead of 101`,
+        statusCode: proxyRes.statusCode,
+        headers: proxyRes.headers,
+        body: body.substring(0, 500),
+        port: port,
+      });
+    });
+  });
+
+  testReq.on("error", (err) => {
+    clearTimeout(timeout);
+    res.status(500).json({ error: err.message, port: port });
+  });
+
+  testReq.end();
+});
+
+/* -------- Debug requests -------- */
+app.use((req, res, next) => {
+  console.log("REQUEST HIT:", req.method, req.url);
+  next();
+});
 
 /* -------- SERVER START -------- */
 const PORT = process.env.PORT || 3000;
@@ -121,22 +181,26 @@ async function start() {
       console.log(`🚀 Backend running at http://localhost:${PORT}`);
     });
 
-    /* WebSocket support for code-server */
-    server.on("upgrade", async (req, socket, head) => {
-      // WS Requests from code-server don't always have the prefix in req.url
-      // but they DO have the referer header: http://localhost:3000/codespace/{projectId}/...
+    /* WebSocket support for code-server (raw socket proxy for maximum reliability) */
+    server.on("upgrade", (req, socket, head) => {
+      console.log(`\n🔌🔌🔌 [UPGRADE EVENT] url=${req.url} head=${head.length}bytes 🔌🔌🔌\n`);
+      // Prevent socket errors from crashing the server
+      socket.on("error", (err) => {
+        console.error("[ws-upgrade] Client socket error:", err.message);
+      });
+
       const referer = req.headers.referer || "";
       let projectId = null;
 
       if (req.url.startsWith("/codespace/")) {
-          const match = req.url.match(/^\/codespace\/([^/?]+)/);
-          projectId = match ? match[1] : null;
+        const match = req.url.match(/^\/codespace\/([^/?]+)/);
+        projectId = match ? match[1] : null;
       } else if (referer.includes("/codespace/")) {
-          const match = referer.match(/\/codespace\/([^/?]+)/);
-          projectId = match ? match[1] : null;
+        const match = referer.match(/\/codespace\/([^/?]+)/);
+        projectId = match ? match[1] : null;
       } else {
-         // Ignore socket.io and other websockets
-         return;
+        // Not a codespace WebSocket — let Socket.IO or others handle it
+        return;
       }
 
       if (!projectId) {
@@ -147,21 +211,95 @@ async function start() {
       let port = codespacePorts.get(projectId);
 
       if (!port) {
-        try {
-          const container = docker.getContainer(`codespace_${projectId}`);
-          const data = await container.inspect();
-
-          port = data.NetworkSettings.Ports["8080/tcp"][0].HostPort;
-          codespacePorts.set(projectId, port);
-        } catch (err) {
-          console.error("Upgrade error:", err);
-          socket.destroy();
-          return;
-        }
+        // Port not cached — try to inspect the container synchronously
+        // (For async fallback, the container should already be tracked)
+        console.error("[ws-upgrade] No cached port for:", projectId);
+        socket.destroy();
+        return;
       }
 
-      const target = `http://localhost:${port}`;
-      codespaceProxy.upgrade(req, socket, head, { target });
+      // Rewrite the URL to strip /codespace/{projectId} prefix
+      const originalUrl = req.url;
+      const prefix = `/codespace/${projectId}`;
+      let targetPath = req.url;
+      if (targetPath.startsWith(prefix)) {
+        targetPath = targetPath.substring(prefix.length) || "/";
+      }
+
+      console.log(`[ws-upgrade] ${originalUrl} → ${targetPath} (port ${port})`);
+
+      // Build headers for the upstream request — forward everything from the client
+      const upstreamHeaders = { ...req.headers };
+      upstreamHeaders.host = `127.0.0.1:${port}`;
+      // CRITICAL: Override Origin to match code-server's host
+      // Code-server validates Origin against its own address and returns 403 if they don't match
+      upstreamHeaders.origin = `http://127.0.0.1:${port}`;
+
+      // Make a raw HTTP upgrade request to code-server
+      const proxyReq = http.request({
+        hostname: "127.0.0.1",
+        port: port,
+        path: targetPath,
+        method: "GET",
+        headers: upstreamHeaders,
+      });
+
+      proxyReq.on("error", (err) => {
+        console.error("[ws-upgrade] Upstream request error:", err.message);
+        socket.destroy();
+      });
+
+      proxyReq.on("upgrade", (proxyRes, proxySocket, proxyHead) => {
+        proxySocket.on("error", (err) => {
+          console.error("[ws-upgrade] Upstream socket error:", err.message);
+        });
+
+        // Construct the 101 Switching Protocols response
+        let responseHead = "HTTP/1.1 101 Switching Protocols\r\n";
+        const resHeaders = proxyRes.headers;
+        for (const key of Object.keys(resHeaders)) {
+          const val = resHeaders[key];
+          if (Array.isArray(val)) {
+            for (const v of val) {
+              responseHead += `${key}: ${v}\r\n`;
+            }
+          } else {
+            responseHead += `${key}: ${val}\r\n`;
+          }
+        }
+        responseHead += "\r\n";
+
+        // Send the 101 response + any buffered head data back to the client
+        socket.write(responseHead);
+        if (proxyHead && proxyHead.length > 0) {
+          socket.write(proxyHead);
+        }
+
+        console.log(`[ws-upgrade] ✅ WebSocket established for ${projectId} on port ${port}`);
+
+        // Pipe bidirectionally: client ↔ code-server
+        proxySocket.pipe(socket);
+        socket.pipe(proxySocket);
+
+        // Cleanup on close
+        proxySocket.on("end", () => socket.end());
+        socket.on("end", () => proxySocket.end());
+        proxySocket.on("close", () => socket.destroy());
+        socket.on("close", () => proxySocket.destroy());
+      });
+
+      proxyReq.on("response", (res) => {
+        // If code-server responded with a normal HTTP response instead of 101,
+        // something went wrong — log it and close
+        console.error(`[ws-upgrade] Got HTTP ${res.statusCode} instead of 101 upgrade`);
+        socket.destroy();
+      });
+
+      // Send the head data (buffered bytes from the initial request) and end the request
+      if (head && head.length > 0) {
+        proxyReq.write(head);
+      }
+      proxyReq.end();
     });
 
   } catch (err) {

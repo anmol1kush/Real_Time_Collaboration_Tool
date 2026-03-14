@@ -1,7 +1,12 @@
 import Docker from "dockerode";
 import http from "http";
+import fs from "fs";
+import { exec } from "child_process";
+import util from "util";
+import { prisma } from "../utils/prisma.js";
 
-const docker = new Docker();// Windows docker pipe
+const execPromise = util.promisify(exec);
+const docker = new Docker(); // Windows docker pipe
 
 // In-memory map: projectId → assigned host port
 // In production, persist this in Redis so it survives restarts
@@ -21,13 +26,40 @@ export async function startCodespace(projectId) {
     }
 
     try {
+        // Fetch project to check if a GitHub repo is linked
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { githubRepo: true }
+        });
+
+        // Ensure workspace directory exists
+        const workspaceDir = `${process.cwd()}/workspace/${projectId}`;
+        if (!fs.existsSync(workspaceDir)) {
+            fs.mkdirSync(workspaceDir, { recursive: true });
+        }
+
+        // If directory is empty and we have a githubRepo, clone it
+        if (project?.githubRepo) {
+            const files = fs.readdirSync(workspaceDir);
+            if (files.length === 0) {
+                console.log(`Cloning repository ${project.githubRepo} into ${workspaceDir}...`);
+                try {
+                    await execPromise(`git clone ${project.githubRepo} .`, { cwd: workspaceDir });
+                    console.log(`Successfully cloned ${project.githubRepo}`);
+                } catch (cloneErr) {
+                    console.error("Failed to clone repository:", cloneErr);
+                    // Continue even if clone fails, they'll get an empty space
+                }
+            }
+        }
+
         // 2. Create fresh container
         const container = await docker.createContainer({
             Image: "codercom/code-server:latest",
             name: `codespace_${projectId}`,
             HostConfig: {
                 PortBindings: {
-                    "8080/tcp": [{ HostPort: "0" }]
+                    "8080/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }]
                 },
                 Binds: [
                     `${process.cwd()}/workspace/${projectId}:/home/coder/workspace`
@@ -42,16 +74,10 @@ export async function startCodespace(projectId) {
             // restore a broken previous session which causes ENOPRO errors.
             // --base-path is REQUIRED for the UI to function correctly behind our proxy.
           Cmd: [
-  "--auth",
-  "none",
-  "--bind-addr",
-  "0.0.0.0:8080",
-  "--proxy-domain",
-  "localhost:3000",
-  "--base-path",
-  `/codespace/${projectId}`,
-  "/home/coder/workspace"
-]
+            "--auth", "none",
+            "--bind-addr", "0.0.0.0:8080",
+            "/home/coder/workspace"
+          ]
         });
 
         await container.start();
@@ -102,8 +128,13 @@ function waitForPortReady(port, maxRetries = 20) {
         let retries = 0;
 
         const check = () => {
-            const req = http.get(`http://localhost:${port}`, (res) => {
-                // code-server usually returns 200 or 302 when ready
+            const req = http.get({
+                hostname: "127.0.0.1",
+                port: port,
+                path: "/",
+                timeout: 1000
+            }, (res) => {
+                // code-server usually returns 200, 302, or 401 when ready
                 if (res.statusCode === 200 || res.statusCode === 302) {
                     resolve(true);
                 } else {
