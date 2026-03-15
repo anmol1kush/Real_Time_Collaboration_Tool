@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../services/api";
 import Navbar from "../components/Nav/Navbar";
@@ -26,10 +26,23 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
 
-  /* ---------- Fetch projects ---------- */
+  // GitHub connection success toast
+  const [githubSuccess, setGithubSuccess] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  /* ---------- Fetch projects & check query params ---------- */
   useEffect(() => {
     fetchProjects();
-  }, []);
+
+    const params = new URLSearchParams(location.search);
+    if (params.get("github") === "connected") {
+      setGithubSuccess(true);
+      setTimeout(() => setGithubSuccess(false), 5000);
+      // Clean up the URL
+      navigate("/dashboard", { replace: true });
+    }
+  }, [location.search, navigate]);
 
   async function fetchProjects() {
     try {
@@ -112,6 +125,21 @@ export default function Dashboard() {
               New Project
             </button>
           </div>
+
+          {/* GitHub Success Toast */}
+          <AnimatePresence>
+            {githubSuccess && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="mb-6 p-4 border border-[#00ff9d]/30 bg-[#00ff9d]/10 text-[#00ff9d] text-sm rounded flex items-center gap-3"
+              >
+                <CheckSquare size={16} />
+                GitHub account connected successfully! You can now push your code from the Codespace.
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Error */}
           {error && (

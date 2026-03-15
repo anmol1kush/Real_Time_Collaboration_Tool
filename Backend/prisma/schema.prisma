@@ -9,11 +9,12 @@ datasource db {
 
 /* -------------------- USER -------------------- */
 model User {
-  id        String   @id
-  email     String   @unique
-  name      String
-  image     String?
-  password  String?
+  id          String   @id
+  email       String   @unique
+  name        String
+  image       String?
+  password    String?
+  githubToken String?
 
   memberships Membership[]
   adminProjects Project[] @relation("ProjectAdmin")

@@ -1,4 +1,5 @@
 import { startCodespace, stopCodespace, codespacePorts } from "../services/docker.service.js";
+import { prisma } from "../utils/prisma.js";
 
 export const getCodespaceStatus = async (req, res) => {
     try {
@@ -17,7 +18,14 @@ export const getCodespaceStatus = async (req, res) => {
 export const startProjectCodespace = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const result = await startCodespace(projectId);
+
+        // Fetch user's GitHub token and identity for git commits
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: { name: true, email: true, githubToken: true }
+        });
+
+        const result = await startCodespace(projectId, user);
 
         return res.status(200).json({
             message: "Codespace started",

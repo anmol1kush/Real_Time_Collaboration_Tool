@@ -5,7 +5,7 @@ import { accordionData } from "../../Data/accordion";
 export default function AccordionComponent() {
   return (
     <div className="w-full max-w-[90%] mx-auto p-4 font-mono">
-      <h2 className="text-5xl font-bold mb-10 text-white font-mono tracking-wide">FAQ</h2>
+      <h2 className="text-5xl font-bold ml-8 mb-10 text-white font-mono tracking-wide">FAQ</h2>
 
       <Accordion
         className="w-full flex-col gap-0 px-0"

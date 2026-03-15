@@ -7,6 +7,7 @@ import taskRoutes, { taskStandaloneRouter } from "./routes/task.routes.js";
 import inviteRoutes from "./routes/invite.routes.js";
 import codespaceRoutes from "./routes/codespace.routes.js";
 import feedbackRoutes from "./routes/feedback.routes.js";
+import githubRoutes from "./routes/github.routes.js";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/api/tasks", taskStandaloneRouter);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/codespace", codespaceRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/github", githubRoutes);
 
 app.get("/", (_, res) => {
   res.send("RTCT API is running");

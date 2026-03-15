@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [githubConnected, setGithubConnected] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -23,6 +24,13 @@ export function AuthProvider({ children }) {
       })
       .then((res) => {
         setUser(res.data.user);
+        
+        // Also fetch GitHub status once user is loaded
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/github/status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(ghRes => setGithubConnected(ghRes.data?.connected || false))
+        .catch(() => setGithubConnected(false));
       })
       .catch(() => {
         localStorage.removeItem("token");
@@ -42,7 +50,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, githubConnected, setGithubConnected }}>
       {children}
     </AuthContext.Provider>
   );

@@ -19,7 +19,10 @@ export const codespacePorts = new Map();
  *   2. Container does not exist → create + start fresh
  *   3. Container exists but stopped (409 conflict) → start it and re-populate port map
  */
-export async function startCodespace(projectId) {
+export async function startCodespace(projectId, user = null) {
+    // Extract token if present
+    const githubToken = user?.githubToken || null;
+
     // 1. Already running and tracked
     if (codespacePorts.has(projectId)) {
         return { port: codespacePorts.get(projectId) };
@@ -38,17 +41,37 @@ export async function startCodespace(projectId) {
             fs.mkdirSync(workspaceDir, { recursive: true });
         }
 
+        // Build clone URL — inject token for authentication if available
+        let repoUrl = project?.githubRepo || "";
+        let authRepoUrl = repoUrl;
+        if (githubToken && repoUrl) {
+            // Convert https://github.com/user/repo.git → https://<token>@github.com/user/repo.git
+            authRepoUrl = repoUrl.replace(
+                /^https:\/\//,
+                `https://${githubToken}@`
+            );
+        }
+
         // If directory is empty and we have a githubRepo, clone it
-        if (project?.githubRepo) {
+        if (repoUrl) {
             const files = fs.readdirSync(workspaceDir);
             if (files.length === 0) {
-                console.log(`Cloning repository ${project.githubRepo} into ${workspaceDir}...`);
+                const cloneUrl = authRepoUrl || repoUrl;
+                console.log(`Cloning repository into ${workspaceDir}...`);
                 try {
-                    await execPromise(`git clone ${project.githubRepo} .`, { cwd: workspaceDir });
-                    console.log(`Successfully cloned ${project.githubRepo}`);
+                    await execPromise(`git clone ${cloneUrl} .`, { cwd: workspaceDir });
+                    console.log(`Successfully cloned repository`);
                 } catch (cloneErr) {
                     console.error("Failed to clone repository:", cloneErr);
                     // Continue even if clone fails, they'll get an empty space
+                }
+            } else if (githubToken) {
+                // Directory already has files — update remote URL with token for push access
+                try {
+                    await execPromise(`git remote set-url origin ${authRepoUrl}`, { cwd: workspaceDir });
+                    console.log(`Updated git remote with authenticated URL`);
+                } catch {
+                    // Not a git repo or remote doesn't exist — ignore
                 }
             }
         }
@@ -68,16 +91,26 @@ export async function startCodespace(projectId) {
             Env: [
                 "PASSWORD=rtct_workspace",
                 "DISABLE_TELEMETRY=true",
-                `VSCODE_PROXY_URI=http://localhost:3000/codespace/${projectId}/{{port}}`
+                `VSCODE_PROXY_URI=http://localhost:3000/codespace/${projectId}/{{port}}`,
+                // Git config — so commits inside the container have an identity
+                ...(githubToken ? [`GIT_AUTH_TOKEN=${githubToken}`] : []),
+                ...(user?.name ? [
+                    `GIT_AUTHOR_NAME=${user.name}`,
+                    `GIT_COMMITTER_NAME=${user.name}`
+                ] : []),
+                ...(user?.email ? [
+                    `GIT_AUTHOR_EMAIL=${user.email}`,
+                    `GIT_COMMITTER_EMAIL=${user.email}`
+                ] : []),
             ],
             // We tell code-server to open a specific directory instead of trying to 
             // restore a broken previous session which causes ENOPRO errors.
             // --base-path is REQUIRED for the UI to function correctly behind our proxy.
-          Cmd: [
-            "--auth", "none",
-            "--bind-addr", "0.0.0.0:8080",
-            "/home/coder/workspace"
-          ]
+            Cmd: [
+                "--auth", "none",
+                "--bind-addr", "0.0.0.0:8080",
+                "/home/coder/workspace"
+            ]
         });
 
         await container.start();

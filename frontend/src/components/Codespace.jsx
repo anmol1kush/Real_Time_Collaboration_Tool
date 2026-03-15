@@ -100,7 +100,7 @@ export default function Codespace({ projectId }) {
       `}</style>
 
       <div style={{
-        display: "flex", flexDirection: "column", height: "85vh", minHeight: 600,
+        display: "flex", flexDirection: "column", height: "100%", minHeight: 600,
         background: "#1e1e1e", border: "1px solid #3c3c3c", borderRadius: 6,
         overflow: "hidden", position: "relative"
       }}>

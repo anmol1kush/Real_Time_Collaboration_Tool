@@ -285,7 +285,7 @@ const DocumentEditor = ({ socket, projectId, documentId }) => {
 
   /* ═══ RENDER ═══ */
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 200px)", minHeight: 480 }}>
+    <div className="flex flex-col" style={{ height: "100%", minHeight: 480 }}>
 
       {/* ── Top toolbar bar ── */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2

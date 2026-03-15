@@ -20,10 +20,10 @@ export default function NavbarComponent() {
       <div className="hidden md:flex items-center gap-8 text-base">
         {user && (
           <>
-            <Link to="/dashboard" className="text-gray-300 hover:text-white transition-colors">
+            <Link to="/dashboard" className="text-gray-300 hover:text-white transition-colors font-semibold">
               Dashboard
             </Link>
-            <Link to="/invites" className="text-[#00ff9d] hover:text-[#00ff9d]/80 transition-colors font-semibold">
+            <Link to="/invites" className="text-gray-300 hover:text-white transition-colors font-semibold">
               Invites
             </Link>
           </>
