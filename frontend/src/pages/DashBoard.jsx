@@ -85,8 +85,21 @@ export default function Dashboard() {
     <>
       <Navbar />
 
-      <div className="min-h-screen bg-black text-white">
-        <div className="px-[8%] pt-10 pb-20">
+      <div className="min-h-screen w-full bg-black relative text-white">
+        {/* Black Basic Grid Background */}
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            background: "#000000",
+            backgroundImage: `
+              linear-gradient(to right, rgba(75, 85, 99, 0.4) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(75, 85, 99, 0.4) 1px, transparent 1px)
+            `,
+            backgroundSize: "40px 40px",
+          }}
+        />
+
+        <div className="relative z-10 px-[8%] pt-10 pb-20">
 
           {/* Header row */}
           <div className="flex items-center justify-between my-8">

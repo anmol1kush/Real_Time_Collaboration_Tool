@@ -9,47 +9,53 @@ export default function NavbarComponent() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav className="w-full h-16 bg-black border-b border-zinc-900 flex items-center justify-between px-6 lg:px-10 font-mono sticky top-0 z-50">
+    <nav className="w-full h-20 bg-black border-b border-zinc-900 flex items-center justify-between px-6 lg:px-10 font-mono sticky top-0 z-50">
       {/* Brand */}
       <Link to="/" className="flex items-center gap-2 text-white">
-        <RTCTLogo />
-        <span className="font-bold text-lg hidden sm:block tracking-widest">RTCT</span>
+        <RTCTLogo size={45} />
+        <span className="font-bold text-xl hidden sm:block tracking-widest">RTCT</span>
       </Link>
 
       {/* Center links */}
-      <div className="hidden md:flex items-center gap-8">
-        <Link to="/dashboard" className="text-sm text-gray-300 hover:text-white transition-colors">
-          Dashboard
-        </Link>
-        <Link to="/chat" className="text-sm text-gray-300 hover:text-white transition-colors">
-          Community
-        </Link>
+      <div className="hidden md:flex items-center gap-8 text-base">
+        {user && (
+          <>
+            <Link to="/dashboard" className="text-gray-300 hover:text-white transition-colors">
+              Dashboard
+            </Link>
+            <Link to="/invites" className="text-[#00ff9d] hover:text-[#00ff9d]/80 transition-colors font-semibold">
+              Invites
+            </Link>
+          </>
+        )}
       </div>
 
       {/* Right side */}
-      <div className="hidden md:flex items-center gap-4">
+      <div className="hidden md:flex items-center gap-5">
         {user ? (
-          <>
-            <span className="text-xs text-zinc-500 truncate max-w-[140px]">{user.email}</span>
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-zinc-800 text-white flex items-center justify-center text-base font-semibold uppercase border border-zinc-700 shadow-sm">
+              {user.name ? user.name[0] : user.email ? user.email[0] : "U"}
+            </div>
             <button
               onClick={logout}
-              className="text-sm text-red-400 hover:text-red-300 transition-colors"
+              className="px-5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all border border-red-500/20 hover:border-red-500/50 text-base font-medium"
             >
-              Logout
+              Sign Out
             </button>
-          </>
+          </div>
         ) : (
-          <>
-            <Link to="/login" className="text-sm text-gray-300 hover:text-white transition-colors">
-              Login
+          <div className="flex items-center gap-4">
+            <Link to="/login" className="px-6 py-2.5 border border-[#00ff9d] text-[#00ff9d] text-sm hover:bg-[#00ff9d]/10 transition-colors rounded-full tracking-widest uppercase font-medium">
+              Log In
             </Link>
             <button
               onClick={() => navigate("/signup")}
-              className="text-sm px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full transition-colors"
+              className="px-6 py-2.5 border border-yellow-400 text-yellow-400 text-sm hover:bg-yellow-400/10 transition-colors rounded-full tracking-widest uppercase font-medium"
             >
-              Sign Up
+              Get Started
             </button>
-          </>
+          </div>
         )}
       </div>
 
@@ -68,15 +74,31 @@ export default function NavbarComponent() {
       {/* Mobile dropdown */}
       {menuOpen && (
         <div className="absolute top-16 left-0 right-0 bg-black border-b border-zinc-800 flex flex-col gap-4 p-6 md:hidden z-50">
-          <Link to="/dashboard" className="text-sm text-gray-300" onClick={() => setMenuOpen(false)}>Dashboard</Link>
-          <Link to="/chat" className="text-sm text-gray-300" onClick={() => setMenuOpen(false)}>Community</Link>
           {user ? (
-            <button onClick={() => { logout(); setMenuOpen(false); }} className="text-sm text-red-400 text-left">Logout</button>
-          ) : (
             <>
-              <Link to="/login" className="text-sm text-gray-300" onClick={() => setMenuOpen(false)}>Login</Link>
-              <Link to="/signup" className="text-sm text-white bg-indigo-600 px-4 py-1.5 rounded-full w-fit" onClick={() => setMenuOpen(false)}>Sign Up</Link>
+              <div className="flex items-center gap-3 mb-2 pb-4 border-b border-zinc-900">
+                <div className="w-10 h-10 rounded-full bg-zinc-800 text-white flex items-center justify-center text-base font-semibold uppercase border border-zinc-700">
+                  {user.name ? user.name[0] : user.email ? user.email[0] : "U"}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-white text-sm font-medium">{user.name || "User"}</span>
+                  <span className="text-zinc-500 text-xs">{user.email}</span>
+                </div>
+              </div>
+              <Link to="/dashboard" className="text-base text-gray-300" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+              <Link to="/invites" className="text-base text-[#00ff9d] font-semibold" onClick={() => setMenuOpen(false)}>Invites</Link>
+              <button onClick={() => { logout(); setMenuOpen(false); }} className="text-base text-red-400 text-left mt-2">Sign Out</button>
             </>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <Link to="/login" className="text-sm tracking-widest uppercase text-[#00ff9d] border border-[#00ff9d] hover:bg-[#00ff9d]/10 text-center py-3 rounded-full font-medium transition-colors" onClick={() => setMenuOpen(false)}>Log In</Link>
+              <button 
+                onClick={() => { navigate("/signup"); setMenuOpen(false); }} 
+                className="text-sm tracking-widest uppercase text-yellow-400 border border-yellow-400 hover:bg-yellow-400/10 py-3 rounded-full font-medium w-full transition-colors"
+              >
+                Get Started
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -5,18 +5,19 @@ import { accordionData } from "../../Data/accordion";
 export default function AccordionComponent() {
   return (
     <div className="w-full max-w-[90%] mx-auto p-4 font-mono">
-      <h2 className="text-5xl font-bold mb-8 text-white">FAQ</h2>
+      <h2 className="text-5xl font-bold mb-10 text-white font-mono tracking-wide">FAQ</h2>
 
       <Accordion
-        className="divide-y divide-zinc-800"
+        className="w-full flex-col gap-0 px-0"
         itemClasses={{
-          base: "py-2",
-          title: "text-white text-base font-mono font-medium",
-          trigger: "py-5 px-0 data-[hover=true]:bg-transparent",
-          indicator: "text-zinc-500",
-          content: "text-gray-400 pb-4 font-mono text-sm",
+          base: "py-2 outline-none border-t border-zinc-900 last:border-b",
+          title: "text-white text-2xl font-mono font-bold tracking-wide",
+          trigger: "py-6 px-0 data-[hover=true]:bg-transparent",
+          indicator: "text-zinc-600 text-sm",
+          content: "text-zinc-400 pb-8 font-mono text-xl leading-relaxed tracking-wide",
         }}
         variant="light"
+        showDivider={false}
       >
         {accordionData.map(({ key, title, content }) => (
           <AccordionItem

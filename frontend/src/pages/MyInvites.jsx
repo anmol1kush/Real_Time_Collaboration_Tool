@@ -45,8 +45,22 @@ export default function MyInvites() {
     return (
         <>
             <Navbar />
-            <div className="min-h-screen bg-black text-white px-[8%] pt-10 pb-20">
-                <h2 className="text-4xl font-bold tracking-tight mb-8">My Invites</h2>
+            <div className="min-h-screen w-full bg-black relative text-white">
+                {/* Black Basic Grid Background */}
+                <div
+                  className="absolute inset-0 z-0"
+                  style={{
+                    background: "#000000",
+                    backgroundImage: `
+                      linear-gradient(to right, rgba(75, 85, 99, 0.4) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(75, 85, 99, 0.4) 1px, transparent 1px)
+                    `,
+                    backgroundSize: "40px 40px",
+                  }}
+                />
+
+                <div className="relative z-10 px-[8%] pt-10 pb-20">
+                    <h2 className="text-4xl font-bold tracking-tight mb-8">My Invites</h2>
 
                 {loading ? (
                     <div className="flex items-center gap-2 text-zinc-500">
@@ -98,6 +112,7 @@ export default function MyInvites() {
                         </AnimatePresence>
                     </div>
                 )}
+                </div>
             </div>
         </>
     );

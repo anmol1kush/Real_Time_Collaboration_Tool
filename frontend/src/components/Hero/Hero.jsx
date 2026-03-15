@@ -1,13 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { RTCTLogo } from "../Logos/Logos";
 import { useAuth } from "../../auth/authContext";
-
-// SVG grid background inline
-const gridBg = {
-  backgroundImage:
-    "url(\"data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0z' fill='none'/%3E%3Cpath d='M0 0h40v40H0z' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1'/%3E%3C/svg%3E\")",
-};
 
 export default function Hero() {
   const { user } = useAuth();
@@ -15,33 +10,57 @@ export default function Hero() {
   return (
     <div
       id="scroll-to-home"
-      className="min-h-[90vh] bg-black flex items-center justify-center relative overflow-hidden"
-      style={gridBg}
+      className="min-h-[calc(100vh-80px)] w-full bg-black relative overflow-hidden flex items-center justify-center"
     >
-      <div className="flex flex-col lg:flex-row items-center gap-10 px-[7vw] w-full max-w-7xl mx-auto py-20">
+      {/* Black Basic Grid Background */}
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          background: "#000000",
+          backgroundImage: `
+            linear-gradient(to right, rgba(75, 85, 99, 0.4) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(75, 85, 99, 0.4) 1px, transparent 1px)
+          `,
+          backgroundSize: "40px 40px",
+        }}
+      />
+      
+      <div className="relative z-10 flex flex-col lg:flex-row items-center gap-10  w-full px-25 pl-35  py-10">
         {/* Left: Text */}
-        <div className="flex-1">
-          <h1 className="text-5xl lg:text-6xl font-bold text-white leading-tight font-mono">
+        <div className="flex-1 lg:pl-0 text-left ">
+          <h1 className="text-4xl lg:text-[62px] font-bold text-white leading-[1.5] font-mono tracking-wide">
             Collaborate<br />
             seamlessly, create<br />
             effortlessly
           </h1>
-          <p className="text-base text-gray-400 mt-6 max-w-md font-mono leading-relaxed">
+          <p className="text-2xl font-bold text-zinc-500 mt-8 max-w-lg font-mono leading-9">
             Transform collaboration with real-time editing of code, documents,
-            and spreadsheets. Enjoy intuitive task management, chat, video
-            calls, and secure cloud deployment. Accomplish more, together.
+            and spreadsheets. Enjoy intuitive task management, chat
+           and secure cloud deployment. Accomplish more, together.
           </p>
 
-          <Link to={user ? "/dashboard" : "/login"} className="inline-block mt-8">
-            <button className="px-6 py-3 rounded-full border border-white/30 text-white font-mono text-sm hover:bg-white/5 transition-colors">
+          <Link to={user ? "/dashboard" : "/login"} className="inline-block mt-12">
+            <button className="px-10 py-4 rounded-full border border-zinc-700 text-white font-mono text-xl tracking-widest hover:bg-white/5 transition-colors">
               Get Started
             </button>
           </Link>
         </div>
 
         {/* Right: Logo */}
-        <div className="hidden lg:flex flex-1 items-center justify-center">
-          <RTCTLogo size="400" />
+        <div className="hidden lg:flex flex-1 items-center justify-center text-white">
+          <motion.div
+            animate={{
+              y: [-12, 12],
+            }}
+            transition={{
+              duration: 3.5,
+              repeat: Infinity,
+              repeatType: "reverse",
+              ease: "easeInOut",
+            }}
+          >
+            <RTCTLogo size="600" />
+          </motion.div>
         </div>
       </div>
     </div>

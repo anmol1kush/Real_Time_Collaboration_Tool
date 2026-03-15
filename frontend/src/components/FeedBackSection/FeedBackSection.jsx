@@ -21,7 +21,7 @@ export default function FeedBackSection() {
     const data = Object.fromEntries(formData.entries());
 
     try {
-      await fetch(`http://localhost:3000/api/feedback`, {
+      const res = await fetch(`http://localhost:5000/api/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -31,10 +31,19 @@ export default function FeedBackSection() {
           experience,
         }),
       });
-      toast.success("Feedback submitted");
+      
+      const resData = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to submit feedback");
+      }
+      
+      toast.success("Feedback submitted successfully!");
       e.target.reset();
-    } catch {
-      toast.error("Error submitting feedback");
+      setExperience(5); // Reset slider
+    } catch (err) {
+      console.error("Feedback error:", err);
+      toast.error(err.message || "Error submitting feedback");
     } finally {
       setLoading(false);
     }

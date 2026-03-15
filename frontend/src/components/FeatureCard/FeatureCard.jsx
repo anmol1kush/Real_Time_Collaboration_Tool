@@ -8,7 +8,7 @@ const features = [
     desc: "Edit code & documents together",
     span: "col-span-12 sm:col-span-4",
     height: "h-[300px]",
-    src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800",
+    src: 'https://assets.technologynetworks.com/production/dynamic/images/content/406893/optibrium-enables-real-time-collaboration-with-stardrop-8-406893-960x540.jpg?cb=13611145',
   },
   {
     id: 2,
@@ -28,11 +28,11 @@ const features = [
   },
   {
     id: 4,
-    name: "VIDEO CONFERENCING",
+    name: "INSTANT COMMUNICATION",
     desc: "Connect with your team instantly",
     span: "col-span-12 sm:col-span-5",
     height: "h-[300px]",
-    src: "https://images.unsplash.com/photo-1609921212029-bb5a28e60960?auto=format&fit=crop&q=80&w=800",
+    src: "https://thumbs.dreamstime.com/z/live-chat-chatting-communication-digital-web-concept-72020923.jpg",
   },
   {
     id: 5,
@@ -49,7 +49,7 @@ export default function FeatureCard() {
     <>
       <h2
         id="scroll-to-features"
-        className="text-5xl font-medium my-5 px-[8%] text-white"
+        className="text-6xl font-medium my-5 px-[8%] text-white"
       >
         Features
       </h2>
@@ -61,7 +61,7 @@ export default function FeatureCard() {
             className={`bg-black ${f.span} ${f.height} hover:scale-105 transition duration-300`}
           >
             <CardHeader className="absolute z-10 top-1 flex-col items-start">
-              <p className="text-tiny text-white/60 uppercase font-bold tracking-widest font-mono">
+              <p className="text-tiny text-white uppercase font-bold tracking-widest font-mono">
                 {f.name}
               </p>
               <h4 className="text-white font-medium text-small font-mono mt-1">
