@@ -186,7 +186,9 @@ function InviteModal({ projectId, onClose }) {
 /* ══════════════════════════════════
    MAIN NAVBAR COMPONENT
 ══════════════════════════════════ */
-export default function NavbarProject({ projectId }) {
+import OnlineUsers from "./OnlineUsers"; // Added Import for Online Users
+
+export default function NavbarProject({ projectId, socket }) {
   const { logout, githubConnected } = useAuth();
   const [showInvite, setShowInvite] = useState(false);
 
@@ -231,8 +233,16 @@ export default function NavbarProject({ projectId }) {
           </div>
         </Link>
 
-        {/* ── Right: GitHub + Invite + Logout ── */}
+        {/* ── Right: Online Users + GitHub + Invite + Logout ── */}
         <div className="flex items-center gap-2">
+          
+          {/* Online Users Pill (Redis logic) */}
+          {socket && (
+            <div className="flex items-center mr-2 px-3 py-1.5 rounded-lg bg-[#00ff9d]/5 border border-[#00ff9d]/20 transition-all">
+              <OnlineUsers socket={socket} />
+            </div>
+          )}
+
           {/* GitHub Connect Button */}
           {githubConnected ? (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium

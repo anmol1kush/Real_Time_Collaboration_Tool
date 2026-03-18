@@ -1,5 +1,6 @@
-import { prisma } from "../utils/prisma.js";
 
+import { prisma } from "../utils/prisma.js";
+import { getCache, setCache, clearCacheByPrefix } from "../utils/redisProject.js";
 /* -------- CREATE PROJECT -------- */
 export async function createProject(req, res) {
   try {
@@ -20,7 +21,7 @@ export async function createProject(req, res) {
       },
       include: { admin: { select: { id: true, name: true, email: true } } }
     });
-
+    await clearCacheByPrefix(`user:${userId}:projects`);  
     res.status(201).json(project);
   } catch (err) {
     console.error("[createProject]", err);
@@ -32,7 +33,17 @@ export async function createProject(req, res) {
 export async function getMyProjects(req, res) {
   try {
     const userId = req.user.id;
+    const cacheKey = `user:${userId}:projects`;
 
+    // 1️⃣ Check Redis cache
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      console.log("Serving from Redis");
+      
+      return res.json(cached);
+    }
+
+    // 2️⃣ Query database
     const memberships = await prisma.membership.findMany({
       where: { userId },
       include: {
@@ -46,8 +57,16 @@ export async function getMyProjects(req, res) {
       orderBy: { joinedAt: "desc" }
     });
 
-    const projects = memberships.map(m => ({ ...m.project, role: m.role }));
+    const projects = memberships.map(m => ({
+      ...m.project,
+      role: m.role
+    }));
+
+    // 3️⃣ Save to Redis
+    await setCache(cacheKey, projects, 3600);
+
     res.json(projects);
+
   } catch (err) {
     console.error("[getMyProjects]", err);
     res.status(500).json({ message: "Failed to fetch projects", error: err.message });
@@ -96,6 +115,7 @@ export async function updateProject(req, res) {
       where: { id: projectId },
       data: { name, image, githubRepo }
     });
+    await clearCacheByPrefix("user:");
 
     res.json(project);
   } catch (err) {
@@ -115,7 +135,7 @@ export async function deleteProject(req, res) {
     await prisma.invite.deleteMany({ where: { projectId } });
     await prisma.membership.deleteMany({ where: { projectId } });
     await prisma.project.delete({ where: { id: projectId } });
-
+    await clearCacheByPrefix("user:");
     res.json({ message: "Project deleted" });
   } catch (err) {
     console.error("[deleteProject]", err);

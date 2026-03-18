@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import { prisma } from "../utils/prisma.js";
 import { generateToken } from "../utils/jwt.js";
-
+import { getOnlineUsers } from "../utils/redisUser.js";
 /* -------- REGISTER -------- */
 export async function register(req, res) {
   try {
@@ -67,4 +67,13 @@ export async function login(req, res) {
 /* -------- CURRENT USER -------- */
 export async function getMe(req, res) {
   res.json(req.user);
+}
+
+export async function fetchOnlineUsers(req, res) {
+    try {
+        const onlineUserIds = await getOnlineUsers();
+        res.json({ onlineUsers: onlineUserIds });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch online presence" });
+    }
 }

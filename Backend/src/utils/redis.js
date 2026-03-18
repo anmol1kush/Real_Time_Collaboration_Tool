@@ -10,3 +10,6 @@ export async function initRedis() {
     console.log(" Redis (Docker) connected");
   }
 }
+
+
+

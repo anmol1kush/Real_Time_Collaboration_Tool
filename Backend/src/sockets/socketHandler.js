@@ -1,17 +1,31 @@
-import { setUserOnline, setUserOffline } from "./presence.js";
 import { Chat } from "../models/chat.model.js";
 import { prisma } from "../utils/prisma.js";
+import {
+  getOnlineUsers,
+  setUserOffline,
+  setUserOnline
+} from "../utils/redisUser.js";
 
 export function registerSocketHandlers(io, socket) {
   const user = socket.user;
 
   /* -------- USER CONNECT -------- */
-  setUserOnline(user.id, socket.id);
-  console.log(`🟢 ${user.name} connected`);
+  setUserOnline(user.id, socket.id).then(async () => {
+    console.log(`🟢 ${user.name} connected`);
 
+    // Broadcast updated online users
+    const onlineUsers = await getOnlineUsers();
+    io.emit("presence:update", onlineUsers);
+  });
+
+  /* -------- USER DISCONNECT -------- */
   socket.on("disconnect", async () => {
     await setUserOffline(user.id);
     console.log(`🔴 ${user.name} disconnected`);
+
+    // Broadcast updated online users
+    const onlineUsers = await getOnlineUsers();
+    io.emit("presence:update", onlineUsers);
   });
 
   /* -------- JOIN PROJECT ROOM -------- */
@@ -37,8 +51,13 @@ export function registerSocketHandlers(io, socket) {
 
     try {
       let chat = await Chat.findOne({ projectId });
+
       if (!chat) {
-        chat = await Chat.create({ projectId, participants: [user.id], messages: [payload] });
+        chat = await Chat.create({
+          projectId,
+          participants: [user.id],
+          messages: [payload]
+        });
       } else {
         chat.messages.push(payload);
         await chat.save();
@@ -50,62 +69,74 @@ export function registerSocketHandlers(io, socket) {
     io.to(projectId).emit("project:message", payload);
   });
 
-  /* -------- LIVE DOCUMENT — FETCH (load from DB) -------- */
-  socket.on("document:fetch", async ({ projectId, documentId }) => {
+  /* -------- LIVE DOCUMENT — FETCH -------- */
+  socket.on("document:fetch", async ({ projectId }) => {
     try {
       const doc = await prisma.document.findFirst({
         where: { projectId }
       });
 
-      if (doc) {
-        socket.emit("document:loaded", doc.content);
-      } else {
-        socket.emit("document:loaded", null); // new document, start blank
-      }
+      socket.emit("document:loaded", doc ? doc.content : null);
     } catch (err) {
       console.error("[document:fetch]", err.message);
       socket.emit("document:loaded", null);
     }
   });
 
-  /* -------- LIVE DOCUMENT — UPDATE (save to DB + broadcast) -------- */
-  const editCounters = {}; // track edits per document in memory
-  socket.on("document:update", async ({ projectId, documentId, data }) => {
+  /* -------- LIVE DOCUMENT — UPDATE -------- */
+  const editCounters = {};
+
+  socket.on("document:update", async ({ projectId, data }) => {
     try {
-      // Upsert current document content
-      const existing = await prisma.document.findFirst({ where: { projectId } });
+      const existing = await prisma.document.findFirst({
+        where: { projectId }
+      });
+
       let docId;
 
       if (existing) {
-        await prisma.document.update({ where: { id: existing.id }, data: { content: data } });
+        await prisma.document.update({
+          where: { id: existing.id },
+          data: { content: data }
+        });
         docId = existing.id;
       } else {
-        const created = await prisma.document.create({ data: { content: data, projectId } });
+        const created = await prisma.document.create({
+          data: { content: data, projectId }
+        });
         docId = created.id;
       }
 
-      // Save a version snapshot every 10 edits
+      // Versioning every 10 edits
       editCounters[docId] = (editCounters[docId] || 0) + 1;
+
       if (editCounters[docId] % 10 === 0) {
         await prisma.documentVersion.create({
-          data: { content: data, savedBy: user.id, documentId: docId }
+          data: {
+            content: data,
+            savedBy: user.id,
+            documentId: docId
+          }
         });
 
-        // Keep only the last 50 versions
-        const versions = await prisma.documentVersion.findMany({
+        // Keep only last 50 versions
+        const oldVersions = await prisma.documentVersion.findMany({
           where: { documentId: docId },
           orderBy: { createdAt: "desc" },
           skip: 50
         });
-        if (versions.length > 0) {
-          await prisma.documentVersion.deleteMany({ where: { id: { in: versions.map(v => v.id) } } });
+
+        if (oldVersions.length > 0) {
+          await prisma.documentVersion.deleteMany({
+            where: { id: { in: oldVersions.map(v => v.id) } }
+          });
         }
       }
     } catch (err) {
       console.error("[document:update] save failed:", err.message);
     }
 
-    // Broadcast to all OTHER clients in the room
+    // Broadcast to others
     socket.to(projectId).emit("document:updated", data);
   });
 

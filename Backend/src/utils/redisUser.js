@@ -1,3 +1,4 @@
+// src/sockets/presence.js
 import { redis } from "../utils/redis.js";
 
 const redisAvailable = () => redis?.isOpen;
@@ -14,7 +15,7 @@ export async function setUserOffline(userId) {
   await redis.del(`online:user:${userId}`);
 }
 
-/* -------- CHECK -------- */
+/* -------- CHECK IF ONE USER IS ONLINE -------- */
 export async function isUserOnline(userId) {
   if (!redisAvailable()) return false;
   return await redis.exists(`online:user:${userId}`);

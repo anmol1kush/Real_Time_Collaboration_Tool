@@ -14,7 +14,7 @@ const TABS = [
   { id: "kanban",     label: "Kanban",     icon: "⬜" },
   { id: "chat",       label: "Chat",       icon: "💬" },
   { id: "document",   label: "Document",   icon: "📄" },
-  { id: "whiteboard", label: "Whiteboard", icon: "🎨" },
+  // { id: "whiteboard", label: "Whiteboard", icon: "🎨" },
   { id: "codespace",  label: "Codespace",  icon: "⌨️"  },
 ];
 
@@ -50,7 +50,7 @@ export default function Project() {
     <div className="min-h-screen w-full relative text-white overflow-hidden" style={GRID_BG}>
 
       {/* ── Navbar ── */}
-      <NavbarProject projectId={projectId} />
+      <NavbarProject projectId={projectId} socket={socket} />
 
       {/* ── Tab bar ── */}
       <div
@@ -119,11 +119,11 @@ export default function Project() {
           </div>
         )}
 
-        {activeTab === "whiteboard" && socket && (
+        {/* {activeTab === "whiteboard" && socket && (
           <div className="h-full">
             <Whiteboard socket={socket} projectId={projectId} />
           </div>
-        )}
+        )} */}
 
         {activeTab === "codespace" && (
           <div className="h-full">
