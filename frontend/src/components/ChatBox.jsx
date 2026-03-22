@@ -105,6 +105,22 @@ export default function ChatBox({ socket, projectId }) {
   const endRef = useRef(null);
   const inputRef = useRef(null);
 
+  /* ── Emit project:join on mount so server sends chat history ── */
+  useEffect(() => {
+    if (!socket || !projectId) return;
+
+    // Request history immediately (server re-sends even if already in room)
+    socket.emit("project:join", projectId);
+
+    // Re-request history on reconnect (handles tab switches after disconnect)
+    const handleReconnect = () => socket.emit("project:join", projectId);
+    socket.on("connect", handleReconnect);
+
+    return () => {
+      socket.off("connect", handleReconnect);
+    };
+  }, [socket, projectId]);
+
   /* ── Socket listeners ── */
   useEffect(() => {
     if (!socket) return;

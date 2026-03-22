@@ -103,7 +103,7 @@ export default function Project() {
       >
         {activeTab === "kanban" && (
           <div className="h-full overflow-y-auto p-5">
-            <KanbanBoard projectId={projectId} />
+            <KanbanBoard projectId={projectId} socket={socket} />
           </div>
         )}
 

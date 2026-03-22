@@ -79,7 +79,7 @@ function Toast({ toasts, removeToast }) {
 }
 
 /* ─── Main Component ─── */
-export default function KanbanBoard({ projectId }) {
+export default function KanbanBoard({ projectId, socket }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newTitle, setNewTitle] = useState({ TODO: "", IN_PROGRESS: "", DONE: "" });
@@ -99,6 +99,36 @@ export default function KanbanBoard({ projectId }) {
   function removeToast(id) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
+
+  /* ── Socket: real-time sync ── */
+  useEffect(() => {
+    if (!socket) return;
+
+    // Another user created a task
+    socket.on("kanban:created", (task) => {
+      setTasks((prev) =>
+        prev.some((t) => t.id === task.id) ? prev : [...prev, task]
+      );
+    });
+
+    // Another user moved a task
+    socket.on("kanban:updated", ({ taskId, status }) => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status } : t))
+      );
+    });
+
+    // Another user deleted a task
+    socket.on("kanban:deleted", ({ taskId }) => {
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    });
+
+    return () => {
+      socket.off("kanban:created");
+      socket.off("kanban:updated");
+      socket.off("kanban:deleted");
+    };
+  }, [socket]);
 
   /* ── Fetch ── */
   useEffect(() => {
@@ -128,6 +158,8 @@ export default function KanbanBoard({ projectId }) {
       setNewTitle((prev) => ({ ...prev, [col]: "" }));
       setAdding(null);
       addToast("Task created!", "success");
+      // Notify other users in real-time
+      socket?.emit("kanban:created", { projectId, task: res.data });
     } catch (err) {
       addToast(err.response?.data?.message || "Failed to create task.");
     } finally {
@@ -141,6 +173,8 @@ export default function KanbanBoard({ projectId }) {
     try {
       await api.put(`/tasks/${taskId}`, { status });
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
+      // Notify other users in real-time
+      socket?.emit("kanban:updated", { projectId, taskId, status });
     } catch {
       addToast("Failed to move task.");
     } finally {
@@ -154,6 +188,8 @@ export default function KanbanBoard({ projectId }) {
     try {
       await api.delete(`/tasks/${taskId}`);
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      // Notify other users in real-time
+      socket?.emit("kanban:deleted", { projectId, taskId });
     } catch {
       addToast("Failed to delete task.");
     } finally {

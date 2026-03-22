@@ -4,17 +4,18 @@ export default function OnlineUsers({ socket }) {
   const [online, setOnline] = useState([]);
 
   useEffect(() => {
-    socket.on("user:online", id =>
-      setOnline(prev => [...new Set([...prev, id])])
-    );
+    if (!socket) return;
 
-    socket.on("user:offline", id =>
-      setOnline(prev => prev.filter(u => u !== id))
-    );
+    // Ask server for current presence immediately on mount
+    socket.emit("presence:get");
+
+    // Server emits an array of online user IDs
+    socket.on("presence:update", (ids) => {
+      setOnline(Array.isArray(ids) ? ids : []);
+    });
 
     return () => {
-      socket.off("user:online");
-      socket.off("user:offline");
+      socket.off("presence:update");
     };
   }, [socket]);
 

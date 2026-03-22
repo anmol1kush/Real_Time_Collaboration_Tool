@@ -39,6 +39,37 @@ export function registerSocketHandlers(io, socket) {
     } catch (err) {
       console.warn("Chat history unavailable (MongoDB offline?)");
     }
+
+    // Send current online users to the joining socket
+    try {
+      const onlineUsers = await getOnlineUsers();
+      socket.emit("presence:update", onlineUsers);
+    } catch (err) {
+      console.warn("Could not fetch online users on join");
+    }
+  });
+
+  /* -------- PRESENCE: GET (on-demand) -------- */
+  socket.on("presence:get", async () => {
+    try {
+      const onlineUsers = await getOnlineUsers();
+      socket.emit("presence:update", onlineUsers);
+    } catch (err) {
+      console.warn("Could not fetch online users");
+    }
+  });
+
+  /* -------- KANBAN: RELAY -------- */
+  socket.on("kanban:created", ({ projectId, task }) => {
+    socket.to(projectId).emit("kanban:created", task);
+  });
+
+  socket.on("kanban:updated", ({ projectId, taskId, status }) => {
+    socket.to(projectId).emit("kanban:updated", { taskId, status });
+  });
+
+  socket.on("kanban:deleted", ({ projectId, taskId }) => {
+    socket.to(projectId).emit("kanban:deleted", { taskId });
   });
 
   /* -------- SEND PROJECT MESSAGE -------- */
