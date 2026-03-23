@@ -17,6 +17,7 @@ const COLUMNS = [
     cardGlow: "hover:shadow-slate-900/40",
     iconColor: "text-slate-400",
     moveBtnHover: "hover:bg-slate-700/50 hover:text-slate-200 hover:border-slate-500",
+    dropHighlight: "ring-2 ring-slate-400/50 bg-slate-800/20",
   },
   {
     key: "IN_PROGRESS",
@@ -30,6 +31,7 @@ const COLUMNS = [
     cardGlow: "hover:shadow-blue-900/40",
     iconColor: "text-blue-400",
     moveBtnHover: "hover:bg-blue-900/50 hover:text-blue-200 hover:border-blue-600",
+    dropHighlight: "ring-2 ring-blue-400/50 bg-blue-900/20",
   },
   {
     key: "DONE",
@@ -43,6 +45,7 @@ const COLUMNS = [
     cardGlow: "hover:shadow-emerald-900/40",
     iconColor: "text-emerald-400",
     moveBtnHover: "hover:bg-emerald-900/50 hover:text-emerald-200 hover:border-emerald-600",
+    dropHighlight: "ring-2 ring-emerald-400/50 bg-emerald-900/20",
   },
 ];
 
@@ -88,7 +91,10 @@ export default function KanbanBoard({ projectId, socket }) {
   const [deleting, setDeleting] = useState(null);
   const [moving, setMoving] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [dragOverCol, setDragOverCol] = useState(null);
   const toastIdRef = useRef(0);
+  const draggedTaskId = useRef(null);
+  const draggedTaskStatus = useRef(null);
 
   /* ── Toast helpers ── */
   function addToast(message, type = "error") {
@@ -104,21 +110,18 @@ export default function KanbanBoard({ projectId, socket }) {
   useEffect(() => {
     if (!socket) return;
 
-    // Another user created a task
     socket.on("kanban:created", (task) => {
       setTasks((prev) =>
         prev.some((t) => t.id === task.id) ? prev : [...prev, task]
       );
     });
 
-    // Another user moved a task
     socket.on("kanban:updated", ({ taskId, status }) => {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, status } : t))
       );
     });
 
-    // Another user deleted a task
     socket.on("kanban:deleted", ({ taskId }) => {
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
     });
@@ -158,7 +161,6 @@ export default function KanbanBoard({ projectId, socket }) {
       setNewTitle((prev) => ({ ...prev, [col]: "" }));
       setAdding(null);
       addToast("Task created!", "success");
-      // Notify other users in real-time
       socket?.emit("kanban:created", { projectId, task: res.data });
     } catch (err) {
       addToast(err.response?.data?.message || "Failed to create task.");
@@ -169,11 +171,13 @@ export default function KanbanBoard({ projectId, socket }) {
 
   /* ── Move ── */
   async function handleMove(taskId, status) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.status === status) return;
+
     setMoving(taskId);
     try {
       await api.put(`/tasks/${taskId}`, { status });
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
-      // Notify other users in real-time
       socket?.emit("kanban:updated", { projectId, taskId, status });
     } catch {
       addToast("Failed to move task.");
@@ -188,12 +192,48 @@ export default function KanbanBoard({ projectId, socket }) {
     try {
       await api.delete(`/tasks/${taskId}`);
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      // Notify other users in real-time
       socket?.emit("kanban:deleted", { projectId, taskId });
     } catch {
       addToast("Failed to delete task.");
     } finally {
       setDeleting(null);
+    }
+  }
+
+  /* ── Drag handlers ── */
+  function handleDragStart(e, task) {
+    draggedTaskId.current = task.id;
+    draggedTaskStatus.current = task.status;
+    e.dataTransfer.effectAllowed = "move";
+    e.currentTarget.style.opacity = "0.5";
+  }
+
+  function handleDragEnd(e) {
+    e.currentTarget.style.opacity = "1";
+    draggedTaskId.current = null;
+    draggedTaskStatus.current = null;
+    setDragOverCol(null);
+  }
+
+  function handleDragOver(e, colKey) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverCol(colKey);
+  }
+
+  function handleDragLeave(e) {
+    // Only clear if leaving the column entirely (not entering a child)
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverCol(null);
+    }
+  }
+
+  function handleDrop(e, colKey) {
+    e.preventDefault();
+    setDragOverCol(null);
+    const taskId = draggedTaskId.current;
+    if (taskId) {
+      handleMove(taskId, colKey);
     }
   }
 
@@ -227,12 +267,17 @@ export default function KanbanBoard({ projectId, socket }) {
         {COLUMNS.map((col) => {
           const ColIcon = col.icon;
           const colTasks = tasks.filter((t) => t.status === col.key);
+          const isDragOver = dragOverCol === col.key;
 
           return (
             <div
               key={col.key}
-              className="flex flex-col rounded-2xl overflow-hidden border border-white/[0.06] bg-[#0d1117] shadow-xl"
+              className={`flex flex-col rounded-2xl overflow-hidden border border-white/[0.06] bg-[#0d1117] shadow-xl transition-all duration-150
+                ${isDragOver ? col.dropHighlight : ""}`}
               style={{ minHeight: 340 }}
+              onDragOver={(e) => handleDragOver(e, col.key)}
+              onDragLeave={(e) => handleDragLeave(e)}
+              onDrop={(e) => handleDrop(e, col.key)}
             >
               {/* Top accent bar */}
               <div className={`h-1 w-full ${col.topBar}`} />
@@ -244,9 +289,7 @@ export default function KanbanBoard({ projectId, socket }) {
                   <span className="font-semibold text-sm text-white/90 tracking-wide">
                     {col.label}
                   </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-mono font-bold ${col.badge}`}
-                  >
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-bold ${col.badge}`}>
                     {colTasks.length}
                   </span>
                 </div>
@@ -315,10 +358,17 @@ export default function KanbanBoard({ projectId, socket }) {
                 )}
               </AnimatePresence>
 
+              {/* Drop zone hint for empty columns */}
+              {isDragOver && colTasks.length === 0 && (
+                <div className="mx-3 mt-3 h-14 rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center">
+                  <span className="text-xs text-white/30">Drop here</span>
+                </div>
+              )}
+
               {/* Task cards list */}
               <div className="flex-1 p-3 space-y-2.5 overflow-y-auto">
                 <AnimatePresence mode="popLayout">
-                  {colTasks.length === 0 && (
+                  {colTasks.length === 0 && !isDragOver && (
                     <motion.div
                       key="empty"
                       initial={{ opacity: 0 }}
@@ -332,7 +382,7 @@ export default function KanbanBoard({ projectId, socket }) {
                       <p className="text-white/25 text-xs text-center leading-relaxed">
                         No tasks here yet
                         <br />
-                        <span className="text-white/15">Click + to add one</span>
+                        <span className="text-white/15">Click + to add or drag a card</span>
                       </p>
                     </motion.div>
                   )}
@@ -345,12 +395,16 @@ export default function KanbanBoard({ projectId, socket }) {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.94, y: 10 }}
                       transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, task)}
+                      onDragEnd={handleDragEnd}
                       className={`group relative bg-[#161b22] border ${col.cardBorder} rounded-xl p-3.5
                         transition-all duration-200 shadow-md ${col.cardGlow}
+                        cursor-grab active:cursor-grabbing select-none
                         ${deleting === task.id ? "opacity-40 scale-95" : ""}
                         ${moving === task.id ? "opacity-60" : ""}`}
                     >
-                      {/* Loading overlay for move */}
+                      {/* Loading overlay while moving */}
                       {moving === task.id && (
                         <div className="absolute inset-0 rounded-xl bg-black/20 flex items-center justify-center backdrop-blur-[1px] z-10">
                           <Loader2 size={16} className="animate-spin text-white/60" />
