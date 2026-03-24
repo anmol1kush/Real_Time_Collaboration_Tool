@@ -1,14 +1,14 @@
-import { startCodespace, stopCodespace, codespacePorts } from "../services/docker.service.js";
+import { startCodespace, stopCodespace, codespaceUrls } from "../services/docker.service.js";
 import { prisma } from "../utils/prisma.js";
 
 export const getCodespaceStatus = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const isRunning = codespacePorts.has(projectId);
+        const isRunning = codespaceUrls.has(projectId);
 
         return res.status(200).json({
             isRunning,
-            port: isRunning ? codespacePorts.get(projectId) : null
+            url: isRunning ? codespaceUrls.get(projectId) : null
         });
     } catch (error) {
         res.status(500).json({ error: "Failed to get codespace status" });
@@ -29,7 +29,7 @@ export const startProjectCodespace = async (req, res) => {
 
         return res.status(200).json({
             message: "Codespace started",
-            port: result.port
+            url: result.url
         });
     } catch (error) {
         console.error(error);

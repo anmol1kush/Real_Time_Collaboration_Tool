@@ -8,9 +8,8 @@ import { prisma } from "../utils/prisma.js";
 const execPromise = util.promisify(exec);
 const docker = new Docker(); // Windows docker pipe
 
-// In-memory map: projectId → assigned host port
-// In production, persist this in Redis so it survives restarts
-export const codespacePorts = new Map();
+// In-memory map: projectId → assigned URL (host:port)
+export const codespaceUrls = new Map();
 
 /**
  * Starts a VS Code server (code-server) container for a project.
@@ -24,8 +23,8 @@ export async function startCodespace(projectId, user = null) {
     const githubToken = user?.githubToken || null;
 
     // 1. Already running and tracked
-    if (codespacePorts.has(projectId)) {
-        return { port: codespacePorts.get(projectId) };
+    if (codespaceUrls.has(projectId)) {
+        return { url: codespaceUrls.get(projectId) };
     }
 
     try {
@@ -76,23 +75,35 @@ export async function startCodespace(projectId, user = null) {
             }
         }
 
+        // Fix permissions so the non-root code-server user can read/write
+        // and fix git dubious ownership (code-server runs as UID 1000)
+        try {
+            await execPromise(`chmod -R 777 ${workspaceDir}`);
+            await execPromise(`chown -R 1000:1000 ${workspaceDir}`);
+        } catch (chmodErr) {
+            console.error("Failed to set permissions:", chmodErr);
+        }
+
+        const isDocker = process.env.RUNNING_IN_DOCKER === "true";
         // 2. Create fresh container
         const container = await docker.createContainer({
             Image: "codercom/code-server:latest",
             name: `codespace_${projectId}`,
             HostConfig: {
-                PortBindings: {
+                NetworkMode: isDocker ? "rtct_net" : "default",
+                PortBindings: isDocker ? {} : {
                     "8080/tcp": [{ HostIp: "127.0.0.1", HostPort: "0" }]
                 },
                 Binds: [
-                    `${process.cwd()}/workspace/${projectId}:/home/coder/workspace`
+                    isDocker 
+                      ? `rtct_workspace_data:/home/coder/project_volume` 
+                      : `${process.cwd()}/workspace/${projectId}:/home/coder/workspace`
                 ]
             },
             Env: [
                 "PASSWORD=rtct_workspace",
                 "DISABLE_TELEMETRY=true",
                 `VSCODE_PROXY_URI=http://localhost:3000/codespace/${projectId}/{{port}}`,
-                // Git config — so commits inside the container have an identity
                 ...(githubToken ? [`GIT_AUTH_TOKEN=${githubToken}`] : []),
                 ...(user?.name ? [
                     `GIT_AUTHOR_NAME=${user.name}`,
@@ -103,17 +114,27 @@ export async function startCodespace(projectId, user = null) {
                     `GIT_COMMITTER_EMAIL=${user.email}`
                 ] : []),
             ],
-            // We tell code-server to open a specific directory instead of trying to 
-            // restore a broken previous session which causes ENOPRO errors.
-            // --base-path is REQUIRED for the UI to function correctly behind our proxy.
             Cmd: [
                 "--auth", "none",
                 "--bind-addr", "0.0.0.0:8080",
-                "/home/coder/workspace"
+                isDocker ? `/home/coder/project_volume/${projectId}` : "/home/coder/workspace"
             ]
         });
 
         await container.start();
+
+        // Fix Git safe.directory inside the container (critical for Windows hosts where chown fails)
+        try {
+            const execCmd = await container.exec({
+                Cmd: ['git', 'config', '--global', '--add', 'safe.directory', '*'],
+                AttachStdout: true,
+                AttachStderr: true
+            });
+            await execCmd.start({});
+        } catch (err) {
+            console.error("Failed to add Git safe.directory:", err);
+        }
+
         return await _inspectAndTrack(container, projectId);
 
     } catch (error) {
@@ -138,31 +159,37 @@ export async function startCodespace(projectId, user = null) {
     }
 }
 
-/**
- * Inspects the container, reads the assigned host port, stores in map,
- * and polls until the internal HTTP server actually responds.
- */
 async function _inspectAndTrack(container, projectId) {
     const data = await container.inspect();
-    const assignedPort = data.NetworkSettings.Ports["8080/tcp"][0].HostPort;
-    codespacePorts.set(projectId, assignedPort);
+    const isDocker = process.env.RUNNING_IN_DOCKER === "true";
+    
+    let targetHost, targetPort;
+    if (isDocker) {
+        targetHost = `codespace_${projectId}`;
+        targetPort = 8080;
+    } else {
+        targetHost = "127.0.0.1";
+        targetPort = data.NetworkSettings.Ports["8080/tcp"][0].HostPort;
+    }
+    
+    const url = `http://${targetHost}:${targetPort}`;
+    codespaceUrls.set(projectId, url);
 
-    // Poll the port until code-server responds (avoids 504 Gateway Timeout in proxy)
-    await waitForPortReady(assignedPort, 20); // wait up to 20 seconds
+    await waitForPortReady(targetHost, targetPort, 20);
 
-    return { port: assignedPort };
+    return { url };
 }
 
 /**
- * Polls localhost:port using a raw TCP socket until it connects.
+ * Polls host:port using a raw TCP socket until it connects.
  */
-function waitForPortReady(port, maxRetries = 20) {
+function waitForPortReady(host, port, maxRetries = 20) {
     return new Promise((resolve, reject) => {
         let retries = 0;
 
         const check = () => {
             const req = http.get({
-                hostname: "127.0.0.1",
+                hostname: host,
                 port: port,
                 path: "/",
                 timeout: 1000
@@ -211,6 +238,6 @@ export async function stopCodespace(projectId) {
             console.error("Docker stop error:", err);
         }
     } finally {
-        codespacePorts.delete(projectId);
+        codespaceUrls.delete(projectId);
     }
 }

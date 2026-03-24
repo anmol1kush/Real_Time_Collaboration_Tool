@@ -1,0 +1,84 @@
+version: '3.8'
+
+networks:
+  rtct_net:
+    name: rtct_net
+
+volumes:
+  pgdata:
+  mongodata:
+  redisdata:
+  workspace_data:
+    name: rtct_workspace_data
+
+services:
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: rtct_backend
+    networks:
+      - rtct_net
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./Backend/.env
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://user:password@postgres:5432/rtct_db
+      - MONGO_URI=mongodb://mongo:27017/rtct_mongo
+      - REDIS_URL=redis://redis:6379
+      - RUNNING_IN_DOCKER=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspace_data:/app/workspace
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rtct_frontend
+    networks:
+      - rtct_net
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: rtct_postgres
+    networks:
+      - rtct_net
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rtct_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:6
+    container_name: rtct_mongo
+    networks:
+      - rtct_net
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: rtct_redis
+    networks:
+      - rtct_net
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data

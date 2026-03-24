@@ -11,7 +11,7 @@ import { prisma } from "./utils/prisma.js";
 
 import { socketAuthMiddleware } from "./sockets/socketAuth.js";
 import { registerSocketHandlers } from "./sockets/socketHandler.js";
-import { codespacePorts } from "./services/docker.service.js";
+import { codespaceUrls } from "./services/docker.service.js";
 
 dotenv.config();
 
@@ -47,22 +47,15 @@ const codespaceProxy = createProxyMiddleware({
 
     if (!projectId) return "http://127.0.0.1:8080";
 
-    let port = codespacePorts.get(projectId);
+    let targetUrl = codespaceUrls.get(projectId);
 
-    if (!port) {
-      try {
-        const container = docker.getContainer(`codespace_${projectId}`);
-        const data = await container.inspect();
-        port = data.NetworkSettings.Ports["8080/tcp"][0].HostPort;
-        codespacePorts.set(projectId, port);
-      } catch (err) {
-        console.error("Missing container for:", projectId);
-        return "http://127.0.0.1:8080";
-      }
+    if (!targetUrl) {
+      targetUrl = "http://127.0.0.1:8080"; // Fallback URL
+      // If we are dynamically fetching, we should reconstruct based on isDocker, but handled earlier
     }
 
-    console.log(`[codespace-proxy] routing ${projectId} → port ${port}`);
-    return `http://127.0.0.1:${port}`;
+    console.log(`[codespace-proxy] routing ${projectId} → ${targetUrl}`);
+    return targetUrl;
   },
 
   pathRewrite: (path, req) => {
@@ -90,15 +83,17 @@ app.use("/codespace", codespaceProxy);
 /* -------- Diagnostic: test WebSocket connectivity to a codespace container -------- */
 app.get("/api/codespace/:projectId/ws-test", (req, res) => {
   const { projectId } = req.params;
-  const port = codespacePorts.get(projectId);
-  if (!port) {
-    return res.status(404).json({ error: "No cached port for this project" });
+  const targetUrl = codespaceUrls.get(projectId);
+  if (!targetUrl) {
+    return res.status(404).json({ error: "No cached URL for this project" });
   }
+
+  const urlObj = new URL(targetUrl);
 
   // Try a raw HTTP upgrade request to code-server
   const testReq = http.request({
-    hostname: "127.0.0.1",
-    port: port,
+    hostname: urlObj.hostname,
+    port: urlObj.port || 80,
     path: "/",
     method: "GET",
     headers: {
@@ -106,7 +101,7 @@ app.get("/api/codespace/:projectId/ws-test", (req, res) => {
       "Upgrade": "websocket",
       "Sec-WebSocket-Version": "13",
       "Sec-WebSocket-Key": "dGVzdA==",  // base64("test")
-      "Host": `127.0.0.1:${port}`,
+      "Host": urlObj.host,
     },
   });
 
@@ -138,14 +133,14 @@ app.get("/api/codespace/:projectId/ws-test", (req, res) => {
         statusCode: proxyRes.statusCode,
         headers: proxyRes.headers,
         body: body.substring(0, 500),
-        port: port,
+        targetUrl,
       });
     });
   });
 
   testReq.on("error", (err) => {
     clearTimeout(timeout);
-    res.status(500).json({ error: err.message, port: port });
+    res.status(500).json({ error: err.message, targetUrl });
   });
 
   testReq.end();
@@ -208,15 +203,15 @@ async function start() {
         return;
       }
 
-      let port = codespacePorts.get(projectId);
+      let targetUrl = codespaceUrls.get(projectId);
 
-      if (!port) {
-        // Port not cached — try to inspect the container synchronously
-        // (For async fallback, the container should already be tracked)
-        console.error("[ws-upgrade] No cached port for:", projectId);
+      if (!targetUrl) {
+        console.error("[ws-upgrade] No cached URL for:", projectId);
         socket.destroy();
         return;
       }
+
+      const urlObj = new URL(targetUrl);
 
       // Rewrite the URL to strip /codespace/{projectId} prefix
       const originalUrl = req.url;
@@ -226,19 +221,17 @@ async function start() {
         targetPath = targetPath.substring(prefix.length) || "/";
       }
 
-      console.log(`[ws-upgrade] ${originalUrl} → ${targetPath} (port ${port})`);
+      console.log(`[ws-upgrade] ${originalUrl} → ${targetPath} (${targetUrl})`);
 
       // Build headers for the upstream request — forward everything from the client
       const upstreamHeaders = { ...req.headers };
-      upstreamHeaders.host = `127.0.0.1:${port}`;
-      // CRITICAL: Override Origin to match code-server's host
-      // Code-server validates Origin against its own address and returns 403 if they don't match
-      upstreamHeaders.origin = `http://127.0.0.1:${port}`;
+      upstreamHeaders.host = urlObj.host;
+      upstreamHeaders.origin = `http://${urlObj.host}`;
 
       // Make a raw HTTP upgrade request to code-server
       const proxyReq = http.request({
-        hostname: "127.0.0.1",
-        port: port,
+        hostname: urlObj.hostname,
+        port: urlObj.port || 80,
         path: targetPath,
         method: "GET",
         headers: upstreamHeaders,
@@ -275,7 +268,7 @@ async function start() {
           socket.write(proxyHead);
         }
 
-        console.log(`[ws-upgrade] ✅ WebSocket established for ${projectId} on port ${port}`);
+        console.log(`[ws-upgrade] ✅ WebSocket established for ${projectId} on ${targetUrl}`);
 
         // Pipe bidirectionally: client ↔ code-server
         proxySocket.pipe(socket);

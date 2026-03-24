@@ -22,6 +22,8 @@ export async function clearCacheByPrefix(prefix) {
   }
 
   if (keys.length) {
-    await redis.del(keys);
+    for (const key of keys) {
+      await redis.del(key);
+    }
   }
 }
