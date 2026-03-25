@@ -59,6 +59,7 @@ export async function startCodespace(projectId, user = null) {
                 console.log(`Cloning repository into ${workspaceDir}...`);
                 try {
                     await execPromise(`git clone ${cloneUrl} .`, { cwd: workspaceDir });
+                    await execPromise(`git config core.filemode false`, { cwd: workspaceDir });
                     console.log(`Successfully cloned repository`);
                 } catch (cloneErr) {
                     console.error("Failed to clone repository:", cloneErr);

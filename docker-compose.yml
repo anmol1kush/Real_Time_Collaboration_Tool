@@ -29,6 +29,7 @@ services:
       - MONGO_URI=mongodb://mongo:27017/rtct_mongo
       - REDIS_URL=redis://redis:6379
       - RUNNING_IN_DOCKER=true
+      - FRONTEND_URL=http://localhost
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - workspace_data:/app/workspace
