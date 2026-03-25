@@ -165,6 +165,39 @@ VITE_API_URL=http://localhost:3000
 
 ## 🚀 How to Run
 
+### 🐳 Run using Docker Compose (Recommended)
+You can spin up the entire application (Frontend, Backend, PostgreSQL, MongoDB, Redis) with a single command. This is highly recommended as it mirrors the production environment and natively supports the Codespace feature out of the box.
+
+**Prerequisites:**
+- **Docker** and **Docker Compose** installed and running on your machine.
+
+**Steps:**
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/rtct.git
+   cd "Real time task Collaboration"
+   ```
+2. Configure the Backend environment variables:
+   ```bash
+   cd Backend
+   cp .env.example .env
+   # (Important: Fill in essential values in .env like GitHub OAuth details)
+   cd ..
+   ```
+3. Start the application stack:
+   ```bash
+   docker-compose up -d --build
+   ```
+4. Access the app!
+   - **Frontend:** http://localhost
+   - **Backend:** http://localhost:3000
+
+To stop all containers, run: `docker-compose down`
+
+---
+
+### 💻 Run Locally (Manual Setup)
+
 ### Prerequisites
 - **Node.js** v18+
 - **PostgreSQL** running locally (or a cloud connection string)
@@ -235,25 +268,11 @@ docker run -d -p 6379:6379 redis:alpine
 - AI-powered task suggestions based on project description and kanban progress
 - Smart chat commands (`/summarize`, `/assign`, `/estimate`)
 
-### 📊 Project Analytics Dashboard
-- Burndown charts and task completion velocity
-- Member contribution stats and activity heatmaps
-- Time-tracking per task with reports
 
 ### 🔔 Notification System
 - In-app real-time notifications for: invites, task assignments, mentions in chat
 - Email digest for daily/weekly activity summaries
 
-
-### 🔒 Enhanced Security
-- Refresh token rotation and revocation
-- Two-factor authentication (2FA) via TOTP or email OTP
-- Per-project audit logs (who changed what, when)
-
-### ☁️ Cloud Deployment & CI/CD
-- Dockerize the entire stack with `docker-compose`
-- Add GitHub Actions pipeline for automated tests and deployment
-- One-click deploy support for Vercel (frontend) + Railway/Render (backend)
 
 ### 🗂️ File Sharing
 - Allow project members to upload and share files (images, PDFs, archives)
